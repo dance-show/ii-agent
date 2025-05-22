@@ -302,7 +302,7 @@ try breaking down the task into smaller steps. After call this tool to update or
                             tool_output=self.tool_manager.get_final_answer(),
                             tool_result_message="Task completed",
                         )
-                except KeyboardInterrupt:
+                except (KeyboardInterrupt, asyncio.CancelledError):
                     # Handle interruption during tool execution
                     self.interrupted = True
                     interrupt_message = "Tool execution was interrupted by user."
@@ -325,7 +325,7 @@ try breaking down the task into smaller steps. After call this tool to update or
                         tool_result_message=interrupt_message,
                     )
 
-            except KeyboardInterrupt:
+            except (KeyboardInterrupt, asyncio.CancelledError):
                 # Handle interruption during model generation or other operations
                 self.interrupted = True
                 self.history.add_assistant_turn(

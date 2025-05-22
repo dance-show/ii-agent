@@ -219,7 +219,32 @@ async def websocket_endpoint(websocket: WebSocket):
                         active_tasks[websocket].cancel()
                         del active_tasks[websocket]
 
-                    # Clear the agent's history from last turn to last user message
+                    # Send acknowledgment that cancellation was received
+                    await websocket.send_json(
+                        RealtimeEvent(
+                            type=EventType.SYSTEM,
+                            content={"message": "Query cancelled"},
+                        ).model_dump()
+                    )
+
+                elif msg_type == "edit_query":
+                    # Get the agent for this connection
+                    agent = active_agents.get(websocket)
+                    if not agent:
+                        await websocket.send_json(
+                            RealtimeEvent(
+                                type=EventType.ERROR,
+                                content={"message": "No active agent for this connection"},
+                            ).model_dump()
+                        )
+                        continue
+
+                    # Cancel any running tasks
+                    if websocket in active_tasks and not active_tasks[websocket].done():
+                        active_tasks[websocket].cancel()
+                        del active_tasks[websocket]
+
+                       # Clear the agent's history from last turn to last user message
                     agent.history.clear_from_last_to_user_message()
 
                     # Delete events from database up to last user message if we have a session ID
@@ -247,6 +272,14 @@ async def websocket_endpoint(websocket: WebSocket):
                                 content={"message": "No active session to clear"},
                             ).model_dump()
                         )
+                        
+                    # Send acknowledgment that query editing was received
+                    await websocket.send_json(
+                        RealtimeEvent(
+                            type=EventType.SYSTEM,
+                            content={"message": "Query editing mode activated"},
+                        ).model_dump()
+                    )
 
                 elif msg_type == "enhance_prompt":
                     # Process a request to enhance a prompt using an LLM
@@ -340,7 +373,6 @@ async def run_agent_async(
     except Exception as e:
         logger.error(f"Error running agent: {str(e)}")
         import traceback
-
         traceback.print_exc()
         await websocket.send_json(
             RealtimeEvent(
