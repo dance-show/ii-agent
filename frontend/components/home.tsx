@@ -58,6 +58,7 @@ export default function Home() {
   const [activeFileCodeEditor, setActiveFileCodeEditor] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isStopped, setIsStopped] = useState(false);
   const [workspaceInfo, setWorkspaceInfo] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
@@ -266,6 +267,7 @@ export default function Home() {
     setIsLoading(true);
     setCurrentQuestion("");
     setIsCompleted(false);
+    setIsStopped(false);
 
     if (!sessionId) {
       const id = `${workspaceInfo}`.split("/").pop();
@@ -336,6 +338,7 @@ export default function Home() {
     setMessages([]);
     setIsLoading(false);
     setIsCompleted(false);
+    setIsStopped(false);
   };
 
   const handleOpenVSCode = () => {
@@ -711,6 +714,23 @@ export default function Home() {
     toast.success("Copied to clipboard");
   };
 
+  const handleCancelQuery = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      toast.error("WebSocket connection is not open.");
+      return;
+    }
+
+    // Send cancel message to the server
+    socket.send(
+      JSON.stringify({
+        type: "cancel",
+        content: {},
+      })
+    );
+    setIsLoading(false);
+    setIsStopped(true);
+  };
+
   useEffect(() => {
     // Connect to WebSocket when the component mounts
     const connectWebSocket = () => {
@@ -883,6 +903,7 @@ export default function Home() {
                   messages={messages}
                   isLoading={isLoading}
                   isCompleted={isCompleted}
+                  isStopped={isStopped}
                   workspaceInfo={workspaceInfo}
                   handleClickAction={handleClickAction}
                   isUploading={isUploading}
@@ -896,6 +917,7 @@ export default function Home() {
                   handleFileUpload={handleFileUpload}
                   isGeneratingPrompt={isGeneratingPrompt}
                   handleEnhancePrompt={handleEnhancePrompt}
+                  handleCancel={handleCancelQuery}
                 />
 
                 <div className="col-span-6 bg-[#1e1f23] border border-[#3A3B3F] p-4 rounded-2xl">

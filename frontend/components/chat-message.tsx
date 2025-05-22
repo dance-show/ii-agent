@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Check } from "lucide-react";
+import { Check, CircleStop } from "lucide-react";
 
 import Action from "@/components/action";
 import Markdown from "@/components/markdown";
@@ -13,6 +13,7 @@ interface ChatMessageProps {
   messages: Message[];
   isLoading: boolean;
   isCompleted: boolean;
+  isStopped: boolean;
   workspaceInfo: string;
   isUploading: boolean;
   isUseDeepResearch: boolean;
@@ -29,12 +30,14 @@ interface ChatMessageProps {
   handleFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   isGeneratingPrompt: boolean;
   handleEnhancePrompt: () => void;
+  handleCancel?: () => void;
 }
 
 const ChatMessage = ({
   messages,
   isLoading,
   isCompleted,
+  isStopped,
   workspaceInfo,
   isUploading,
   isUseDeepResearch,
@@ -47,6 +50,7 @@ const ChatMessage = ({
   handleFileUpload,
   isGeneratingPrompt,
   handleEnhancePrompt,
+  handleCancel,
 }: ChatMessageProps) => {
   return (
     <div className="col-span-4">
@@ -206,6 +210,13 @@ const ChatMessage = ({
           </div>
         )}
 
+        {isStopped && (
+          <div className="flex gap-x-2 items-center bg-[#ffbf361f] text-yellow-300 text-sm p-2 rounded-full">
+            <CircleStop className="size-4" />
+            <span>II-Agent has stopped, send a new message to continue.</span>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </motion.div>
       <motion.div
@@ -227,6 +238,8 @@ const ChatMessage = ({
           isUseDeepResearch={isUseDeepResearch}
           isGeneratingPrompt={isGeneratingPrompt}
           handleEnhancePrompt={handleEnhancePrompt}
+          isLoading={isLoading}
+          handleCancel={handleCancel}
         />
       </motion.div>
     </div>
