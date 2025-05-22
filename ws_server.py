@@ -202,21 +202,49 @@ async def websocket_endpoint(websocket: WebSocket):
                         RealtimeEvent(type=EventType.PONG, content={}).model_dump()
                     )
 
-                elif msg_type == "cancel":
-                    # Cancel the current agent task if one exists
-                    if websocket in active_tasks and not active_tasks[websocket].done():
-                        active_tasks[websocket].cancel()
+                elif msg_type == "cancel": 
+                    # Get the agent for this connection
+                    agent = active_agents.get(websocket)
+                    if not agent:
                         await websocket.send_json(
                             RealtimeEvent(
-                                type=EventType.SYSTEM,
-                                content={"message": "Query canceled"},
+                                type=EventType.ERROR,
+                                content={"message": "No active agent for this connection"},
                             ).model_dump()
                         )
+                        continue
+
+                    # Cancel any running tasks
+                    if websocket in active_tasks and not active_tasks[websocket].done():
+                        active_tasks[websocket].cancel()
+                        del active_tasks[websocket]
+
+                    # Clear the agent's history from last turn to last user message
+                    agent.history.clear_from_last_to_user_message()
+
+                    # Delete events from database up to last user message if we have a session ID
+                    if agent.session_id:
+                        try:
+                            agent.db_manager.delete_events_from_last_to_user_message(agent.session_id)
+                            await websocket.send_json(
+                                RealtimeEvent(
+                                    type=EventType.SYSTEM,
+                                    content={"message": "Session history cleared from last event to last user message"},
+                                ).model_dump()
+                            )
+                        except Exception as e:
+                            logger.error(f"Error deleting session events: {str(e)}")
+                            await websocket.send_json(
+                                RealtimeEvent(
+                                    type=EventType.ERROR,
+                                    content={"message": f"Error clearing history: {str(e)}"},
+                                ).model_dump()
+                            )
                     else:
                         await websocket.send_json(
                             RealtimeEvent(
                                 type=EventType.ERROR,
-                                content={"message": "No active query to cancel"},
+                                content={"message": "No active session to clear"},
                             ).model_dump()
                         )
 
