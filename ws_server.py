@@ -286,6 +286,37 @@ async def websocket_endpoint(websocket: WebSocket):
                         ).model_dump()
                     )
 
+                    # Check if there's an active task for this connection
+                    if websocket in active_tasks and not active_tasks[websocket].done():
+                        await websocket.send_json(
+                            RealtimeEvent(
+                                type=EventType.ERROR,
+                                content={
+                                    "message": "A query is already being processed"
+                                },
+                            ).model_dump()
+                        )
+                        continue
+
+                    # Process a query to the agent
+                    user_input = content.get("text", "")
+                    resume = content.get("resume", False)
+                    files = content.get("files", [])
+
+                    # Send acknowledgment
+                    await websocket.send_json(
+                        RealtimeEvent(
+                            type=EventType.PROCESSING,
+                            content={"message": "Processing your request..."},
+                        ).model_dump()
+                    )
+
+                    # Run the agent with the query in a separate task
+                    task = asyncio.create_task(
+                        run_agent_async(websocket, user_input, resume, files)
+                    )
+                    active_tasks[websocket] = task
+
                 elif msg_type == "enhance_prompt":
                     # Process a request to enhance a prompt using an LLM
                     user_input = content.get("text", "")
