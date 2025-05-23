@@ -71,6 +71,7 @@ export default function Home() {
   );
   const [browserUrl, setBrowserUrl] = useState("");
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Message>();
 
   const isReplayMode = useMemo(() => !!searchParams.get("id"), [searchParams]);
 
@@ -353,6 +354,46 @@ export default function Home() {
     } catch {
       return null;
     }
+  };
+
+  const handleEditMessage = (newQuestion: string) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      toast.error("WebSocket connection is not open. Please try again.");
+      setIsLoading(false);
+      return;
+    }
+
+    socket.send(
+      JSON.stringify({
+        type: "edit_query",
+        content: {
+          text: newQuestion,
+          files: uploadedFiles?.map((file) => `.${file}`),
+        },
+      })
+    );
+
+    // Update the edited message and remove all subsequent messages
+    setMessages((prev) => {
+      // Find the index of the message being edited
+      const editIndex = prev.findIndex((m) => m.id === editingMessage?.id);
+      if (editIndex >= 0) {
+        // Create a new array with messages up to and including the edited one
+        const updatedMessages = prev.slice(0, editIndex + 1);
+        // Update the content of the edited message
+        updatedMessages[editIndex] = {
+          ...updatedMessages[editIndex],
+          content: newQuestion,
+        };
+        return updatedMessages;
+      }
+      return prev;
+    });
+
+    setIsCompleted(false);
+    setIsStopped(false);
+    setIsLoading(true);
+    setEditingMessage(undefined);
   };
 
   const handleFileUpload = async (
@@ -918,6 +959,9 @@ export default function Home() {
                   isGeneratingPrompt={isGeneratingPrompt}
                   handleEnhancePrompt={handleEnhancePrompt}
                   handleCancel={handleCancelQuery}
+                  editingMessage={editingMessage}
+                  setEditingMessage={setEditingMessage}
+                  handleEditMessage={handleEditMessage}
                 />
 
                 <div className="col-span-6 bg-[#1e1f23] border border-[#3A3B3F] p-4 rounded-2xl">
