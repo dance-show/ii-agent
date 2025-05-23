@@ -381,9 +381,14 @@ try breaking down the task into smaller steps. After call this tool to update or
     def add_fake_assistant_turn(self, text: str):
         """Add a fake assistant turn to the history and send it to the message queue."""
         self.history.add_assistant_turn([TextResult(text=text)])
+        if self.interrupted:
+            rsp_type = EventType.AGENT_RESPONSE_INTERRUPTED
+        else:
+            rsp_type = EventType.AGENT_RESPONSE
+
         self.message_queue.put_nowait(
             RealtimeEvent(
-                type=EventType.AGENT_RESPONSE,
+                type=rsp_type,
                 content={"text": text},
             )
         )
