@@ -106,7 +106,7 @@ async def websocket_endpoint(websocket: WebSocket):
             project_id=global_args.project_id,
             region=global_args.region,
         )
-        
+
         # Initial connection message with session info
         await websocket.send_json(
             RealtimeEvent(
@@ -202,22 +202,21 @@ async def websocket_endpoint(websocket: WebSocket):
                         RealtimeEvent(type=EventType.PONG, content={}).model_dump()
                     )
 
-                elif msg_type == "cancel": 
+                elif msg_type == "cancel":
                     # Get the agent for this connection
                     agent = active_agents.get(websocket)
                     if not agent:
                         await websocket.send_json(
                             RealtimeEvent(
                                 type=EventType.ERROR,
-                                content={"message": "No active agent for this connection"},
+                                content={
+                                    "message": "No active agent for this connection"
+                                },
                             ).model_dump()
                         )
                         continue
 
-                    # Cancel any running tasks
-                    if websocket in active_tasks and not active_tasks[websocket].done():
-                        active_tasks[websocket].cancel()
-                        del active_tasks[websocket]
+                    agent.cancel()
 
                     # Send acknowledgment that cancellation was received
                     await websocket.send_json(
@@ -234,27 +233,31 @@ async def websocket_endpoint(websocket: WebSocket):
                         await websocket.send_json(
                             RealtimeEvent(
                                 type=EventType.ERROR,
-                                content={"message": "No active agent for this connection"},
+                                content={
+                                    "message": "No active agent for this connection"
+                                },
                             ).model_dump()
                         )
                         continue
 
-                    # Cancel any running tasks
-                    if websocket in active_tasks and not active_tasks[websocket].done():
-                        active_tasks[websocket].cancel()
-                        del active_tasks[websocket]
+                    # Cancel the agent
+                    agent.cancel()
 
-                       # Clear the agent's history from last turn to last user message
+                    # Clear the agent's history from last turn to last user message
                     agent.history.clear_from_last_to_user_message()
 
                     # Delete events from database up to last user message if we have a session ID
                     if agent.session_id:
                         try:
-                            agent.db_manager.delete_events_from_last_to_user_message(agent.session_id)
+                            agent.db_manager.delete_events_from_last_to_user_message(
+                                agent.session_id
+                            )
                             await websocket.send_json(
                                 RealtimeEvent(
                                     type=EventType.SYSTEM,
-                                    content={"message": "Session history cleared from last event to last user message"},
+                                    content={
+                                        "message": "Session history cleared from last event to last user message"
+                                    },
                                 ).model_dump()
                             )
                         except Exception as e:
@@ -262,7 +265,9 @@ async def websocket_endpoint(websocket: WebSocket):
                             await websocket.send_json(
                                 RealtimeEvent(
                                     type=EventType.ERROR,
-                                    content={"message": f"Error clearing history: {str(e)}"},
+                                    content={
+                                        "message": f"Error clearing history: {str(e)}"
+                                    },
                                 ).model_dump()
                             )
                     else:
@@ -272,7 +277,7 @@ async def websocket_endpoint(websocket: WebSocket):
                                 content={"message": "No active session to clear"},
                             ).model_dump()
                         )
-                        
+
                     # Send acknowledgment that query editing was received
                     await websocket.send_json(
                         RealtimeEvent(
@@ -285,14 +290,14 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Process a request to enhance a prompt using an LLM
                     user_input = content.get("text", "")
                     files = content.get("files", [])
-                    
+
                     # Call the enhance_prompt function from the module
                     success, message, enhanced_prompt = await enhance_user_prompt(
                         client=client,
                         user_input=user_input,
                         files=files,
                     )
-                    
+
                     if success and enhanced_prompt:
                         # Send the enhanced prompt back to the client
                         await websocket.send_json(
@@ -368,11 +373,14 @@ async def run_agent_async(
             RealtimeEvent(type=EventType.USER_MESSAGE, content={"text": user_input})
         )
         # Run the agent with the query
-        await anyio.to_thread.run_sync(agent.run_agent, user_input, files, resume)
+        await anyio.to_thread.run_sync(
+            agent.run_agent, user_input, files, resume, abandon_on_cancel=True
+        )
 
     except Exception as e:
         logger.error(f"Error running agent: {str(e)}")
         import traceback
+
         traceback.print_exc()
         await websocket.send_json(
             RealtimeEvent(
