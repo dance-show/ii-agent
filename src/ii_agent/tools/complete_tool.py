@@ -9,7 +9,7 @@ class CompleteTool(LLMTool):
     name = "complete"
     """The model should call this tool when it is done with the task."""
 
-    description = "Call this tool when you are done with the task"
+    description = "Call this tool to complete the task or give the control back to the user"
     input_schema = {
         "type": "object",
         "properties": {
